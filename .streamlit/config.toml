@@ -3,9 +3,12 @@ headless = true
 address = "0.0.0.0"
 port = 8501
 
+[browser]
+gatherUsageStats = false
+
 [theme]
-primaryColor = "#F63366"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F0F2F6"
+primaryColor = "#d33b3b"
+backgroundColor = "#fbfbfb"
+secondaryBackgroundColor = "#e6e6e6"
 textColor = "#262730"
 font = "sans serif"
