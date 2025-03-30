@@ -3,6 +3,11 @@ import pandas as pd
 import numpy as np
 import os
 import io
+import sys
+
+# Sicherstellen, dass das aktuelle Verzeichnis im Python-Pfad ist
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from helpers import display_header, display_footer, load_demo_data
 from data_processor import (
     process_sales_data, process_recipe_data, process_inventory_data,
