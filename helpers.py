@@ -10,17 +10,17 @@ def display_header():
     col1, col2 = st.columns([1, 3])
     
     with col1:
-        # Display cocktail icon
-        st.markdown("# 🍹")
+        # Display RumBar logo
+        st.image("static/images/20241003_Logo_Rumbar_negativ.jpg", width=150)
     
     with col2:
-        st.title("Barkeeper")
-        st.subheader("Beverage Management System")
+        st.title("Warenwirtschaft RumBar Falkensee")
+        st.subheader("Getränke-Management-System")
 
 def display_footer():
     """Display the application footer"""
     st.markdown("---")
-    st.markdown("© 2023 Barkeeper - Beverage Management System")
+    st.markdown("© 2024 RumBar Falkensee - Warenwirtschaft System")
 
 def load_demo_data():
     """Load the demo data from the provided CSV files"""

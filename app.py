@@ -8,12 +8,13 @@ from data_processor import (
     process_sales_data, process_recipe_data, process_inventory_data,
     update_inventory_based_on_sales, calculate_drink_costs,
     calculate_available_drinks, get_low_stock_warnings,
-    update_recipe_data, update_inventory_data, calculate_sales_summary
+    update_recipe_data, update_inventory_data, calculate_sales_summary,
+    export_low_stock_warnings_to_csv
 )
 
 # Set page config
 st.set_page_config(
-    page_title="Barkeeper - Beverage Management",
+    page_title="Warenwirtschaft RumBar Falkensee",
     page_icon="🍹",
     layout="wide"
 )
@@ -69,7 +70,7 @@ if st.sidebar.button("Reset All Data"):
 
 # Dashboard Page
 if page == "Dashboard":
-    st.title("Beverage Management Dashboard")
+    st.title("Warenwirtschaft Dashboard")
     
     if (st.session_state.inventory_data is None or 
         st.session_state.recipe_data is None):
@@ -117,6 +118,20 @@ if page == "Dashboard":
             warning_df = pd.DataFrame(st.session_state.low_stock_warnings)
             warning_df = warning_df.sort_values('max_drinks_possible', ascending=True)
             st.dataframe(warning_df, use_container_width=True)
+            
+            # Export to CSV button
+            csv_data = export_low_stock_warnings_to_csv(st.session_state.low_stock_warnings)
+            if csv_data:
+                col1, col2 = st.columns([1, 5])
+                with col1:
+                    current_date = pd.Timestamp.now().strftime('%Y-%m-%d')
+                    st.download_button(
+                        label="📥 Export Einkaufsliste",
+                        data=csv_data,
+                        file_name=f"RumBar_Einkaufsliste_{current_date}.csv",
+                        mime="text/csv",
+                        help="Exportiere die Zutatenliste mit niedrigem Bestand als CSV-Datei für den Einkauf"
+                    )
         else:
             st.success("No low stock warnings - all ingredients have sufficient quantities!")
         

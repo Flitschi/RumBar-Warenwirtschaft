@@ -354,6 +354,50 @@ def calculate_available_drinks(recipe_data, inventory_data):
         print(f"Error calculating available drinks: {str(e)}")
         return None
 
+def export_low_stock_warnings_to_csv(warnings):
+    """
+    Export low stock warnings to a CSV file for creating a shopping list
+    
+    Args:
+        warnings: List of dictionaries with warning information
+    
+    Returns:
+        bytes: CSV file content as bytes
+    """
+    try:
+        if not warnings or len(warnings) == 0:
+            return None
+            
+        # Convert warnings to DataFrame
+        warnings_df = pd.DataFrame(warnings)
+        
+        # Select and rename columns for the shopping list
+        shopping_list = warnings_df[['ingredient_name', 'current_stock_ml', 'target_stock_ml']]
+        shopping_list = shopping_list.rename(columns={
+            'ingredient_name': 'Zutat',
+            'current_stock_ml': 'Aktueller Bestand (ml)',
+            'target_stock_ml': 'Zielbestand (ml)'
+        })
+        
+        # Add a column for the amount to purchase
+        shopping_list['Benötigte Menge (ml)'] = shopping_list['Zielbestand (ml)'] - shopping_list['Aktueller Bestand (ml)']
+        shopping_list['Benötigte Menge (ml)'] = shopping_list['Benötigte Menge (ml)'].apply(lambda x: max(0, x))
+        
+        # Add a column for the amount to purchase in bottles (assume 700ml per bottle)
+        shopping_list['Benötigte Flaschen (à 700ml)'] = (shopping_list['Benötigte Menge (ml)'] / 700).round(2)
+        
+        # Sort by needed amount (descending)
+        shopping_list = shopping_list.sort_values('Benötigte Menge (ml)', ascending=False)
+        
+        # Convert to CSV
+        csv_data = shopping_list.to_csv(index=False, encoding='utf-8-sig', sep=';')
+        
+        return csv_data.encode()
+    
+    except Exception as e:
+        print(f"Error exporting low stock warnings: {str(e)}")
+        return None
+
 def get_low_stock_warnings(recipe_data, inventory_data, threshold=15):
     """
     Get warnings for ingredients with low stock (can make fewer than threshold drinks)
@@ -389,6 +433,7 @@ def get_low_stock_warnings(recipe_data, inventory_data, threshold=15):
                 if not ingredient_info.empty and amount_needed > 0:
                     # Get current stock
                     current_stock = ingredient_info['current_stock_ml'].values[0]
+                    target_stock = ingredient_info['target_stock_ml'].values[0]
                     
                     # Calculate how many drinks can be made with this ingredient
                     drinks_possible = int(current_stock / amount_needed)
@@ -398,6 +443,7 @@ def get_low_stock_warnings(recipe_data, inventory_data, threshold=15):
                         ingredient_min_drinks[ingredient_name] = {
                             'max_drinks_possible': drinks_possible,
                             'current_stock_ml': current_stock,
+                            'target_stock_ml': target_stock,
                             'most_limiting_drink': drink_name
                         }
         
@@ -408,6 +454,7 @@ def get_low_stock_warnings(recipe_data, inventory_data, threshold=15):
                 warnings.append({
                     'ingredient_name': ingredient_name,
                     'current_stock_ml': data['current_stock_ml'],
+                    'target_stock_ml': data['target_stock_ml'],
                     'max_drinks_possible': data['max_drinks_possible'],
                     'most_limiting_drink': data['most_limiting_drink']
                 })
