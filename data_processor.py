@@ -89,8 +89,24 @@ def process_sales_data(sales_file):
         # Read the content of the file
         content = sales_file.read().decode('utf-8')
         
+        # Kleine Vorverarbeitung, um Semikolons in Produktnamen zu handhaben
+        processed_content = ""
+        for line in content.split('\n'):
+            # Wenn es ein Produktdateneintrag sein könnte (Zeilen ab 80)
+            if line.strip() and ';' in line and not line.startswith(';'):
+                # Clean product name strings
+                if line.count(';') >= 4:  # Wir haben mindestens 5 Spalten
+                    parts = line.split(';', 1)  # Teile am ersten Semikolon
+                    product_name = parts[0].strip()
+                    rest = parts[1]
+                    processed_content += f"{product_name};{rest}\n"
+                else:
+                    processed_content += line + "\n"
+            else:
+                processed_content += line + "\n"
+                
         # Parse the CSV content using csv module with custom dialect
-        reader = csv.reader(io.StringIO(content), delimiter=';')
+        reader = csv.reader(io.StringIO(processed_content), delimiter=';')
         rows = list(reader)
         
         # Extract date from line 2
@@ -115,21 +131,60 @@ def process_sales_data(sales_file):
         products_section_start = None
         
         for i, row in enumerate(rows):
-            if len(row) > 0 and row[0] == "Produkte":
+            if len(row) > 0 and row[0].strip() == "Produkte":
                 products_section_start = i + 2  # +2 to skip header row
+                break
+            
+            # Alternativ nach "Produkte;Total" Zeile suchen (Format könnte variieren)
+            elif len(row) > 1 and row[0].strip() == "Produkte" and "Total" in row[1]:
+                products_section_start = i + 1  # +1 to skip header row
                 break
         
         if products_section_start is not None:
+            # Debug-Information für die Produkte-Sektion
+            print(f"Produkte-Sektion beginnt bei Zeile {products_section_start}")
+            if products_section_start and products_section_start < len(rows):
+                print(f"Header der Produkte-Sektion: {rows[products_section_start-1]}")
+                if products_section_start < len(rows):
+                    print(f"Erste Produkt-Zeile: {rows[products_section_start]}")
+                    
             # Read product data
             for i in range(products_section_start, len(rows)):
                 row = rows[i]
-                if len(row) < 6 or not row[0]:  # Stop when we reach an empty row
+                if len(row) < 2 or not row[0]:  # Stop when we reach an empty row (mindestens Name und eine weitere Spalte)
                     break
                 
                 # Extract product name, quantity, and total
-                product_name = row[1]
-                quantity_str = row[2]
-                total_str = row[3]
+                # Check the format of the row to determine the correct columns
+                # Standardformat in den obersten Zeilen: Produkt ist tatsächlich in der ersten Spalte
+                product_name = row[0]  # Die Produkte stehen in der ersten Spalte (Index 0)
+                
+                # Wenn wir in den "Produkte;Total" Zeilen sind, könnte das Format anders sein
+                # Versuche verschiedene Spaltenindizes für die Daten
+                if ";" in row[0] or row[0].isdigit():  # Falls ein Semikolon im Namen ist oder die erste Spalte eine Zahl ist
+                    # Möglicherweise ist die zweite Spalte der Produktname
+                    if len(row) > 1 and row[1] and not row[1].isdigit():
+                        product_name = row[1]
+                
+                # Versuche verschiedene mögliche Spalten für Menge und Gesamtpreis
+                # Durchlaufe mögliche Indizes für Menge und Preis
+                quantity_str = None
+                total_str = None
+                
+                for i in range(1, min(6, len(row))):
+                    val = row[i].strip() if i < len(row) else ""
+                    if val and val.isdigit():  # Falls wir eine ganze Zahl finden (wahrscheinlich Menge)
+                        quantity_str = val
+                        # Der nächste Wert könnte der Preis sein
+                        if i+1 < len(row):
+                            total_str = row[i+1].strip()
+                        break
+                
+                # Fallback für ältere Versionen des Codes
+                if quantity_str is None and len(row) > 2:
+                    quantity_str = row[2]
+                if total_str is None and len(row) > 3:
+                    total_str = row[3]
                 
                 # Clean and convert values
                 if product_name and quantity_str and total_str:
