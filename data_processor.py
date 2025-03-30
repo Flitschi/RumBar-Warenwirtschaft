@@ -86,110 +86,111 @@ def process_sales_data(sales_file):
         dict: Processed sales data with date, total, and products
     """
     try:
-        # Read the content of the file
+        # Zuerst lesen wir den gesamten Inhalt der Datei ein
         content = sales_file.read().decode('utf-8')
         
-        # Kleine Vorverarbeitung, um Semikolons in Produktnamen zu handhaben
-        processed_content = ""
-        for line in content.split('\n'):
-            # Wenn es ein Produktdateneintrag sein könnte (Zeilen ab 80)
-            if line.strip() and ';' in line and not line.startswith(';'):
-                # Clean product name strings
-                if line.count(';') >= 4:  # Wir haben mindestens 5 Spalten
-                    parts = line.split(';', 1)  # Teile am ersten Semikolon
-                    product_name = parts[0].strip()
-                    rest = parts[1]
-                    processed_content += f"{product_name};{rest}\n"
-                else:
-                    processed_content += line + "\n"
-            else:
-                processed_content += line + "\n"
-                
-        # Parse the CSV content using csv module with custom dialect
-        reader = csv.reader(io.StringIO(processed_content), delimiter=';')
-        rows = list(reader)
+        # Wir teilen den Inhalt in Zeilen auf, um ihn besser zu analysieren
+        lines = content.split('\n')
         
-        # Extract date from line 2
-        date_row = rows[1] if len(rows) > 1 else []
-        date_str = date_row[2] if len(date_row) > 2 else "Unknown"
+        # Datum extrahieren (sollte in Zeile 2 sein)
+        date_str = "Unknown"
+        if len(lines) > 1 and ";" in lines[1]:
+            date_parts = lines[1].split(';')
+            if len(date_parts) > 2:
+                date_str = date_parts[2].strip()
         
-        # Try to parse the date
+        # Datum formatieren
         try:
             date_obj = datetime.strptime(date_str, "%d.%m.%Y")
             date_formatted = date_obj.strftime("%Y-%m-%d")
         except:
             date_formatted = date_str
         
-        # Initialize result dictionary
+        # Ergebnis-Dictionary initialisieren
         result = {
             'date': date_formatted,
             'total_sales': 0,
             'products': []
         }
         
-        # Extract products from the "Produkte" section - should start around line 80
-        products_section_start = None
-        
-        for i, row in enumerate(rows):
-            if len(row) > 0 and row[0].strip() == "Produkte":
-                products_section_start = i + 2  # +2 to skip header row
-                break
-            
-            # Alternativ nach "Produkte;Total" Zeile suchen (Format könnte variieren)
-            elif len(row) > 1 and row[0].strip() == "Produkte" and "Total" in row[1]:
-                products_section_start = i + 1  # +1 to skip header row
+        # Jetzt suchen wir die Produktdaten
+        # Diese beginnen normalerweise mit einer Zeile, die "Produkte" in der ersten Spalte enthält
+        products_section_start = -1
+        for i, line in enumerate(lines):
+            if "Produkte;Total" in line or (line.startswith("Produkte") and ";Total;" in line):
+                products_section_start = i + 1  # Die nächste Zeile sollte die Header-Zeile sein
                 break
         
-        if products_section_start is not None:
-            # Debug-Information für die Produkte-Sektion
-            print(f"Produkte-Sektion beginnt bei Zeile {products_section_start}")
-            if products_section_start and products_section_start < len(rows):
-                print(f"Header der Produkte-Sektion: {rows[products_section_start-1]}")
-                if products_section_start < len(rows):
-                    print(f"Erste Produkt-Zeile: {rows[products_section_start]}")
-                    
-            # Read product data
-            for i in range(products_section_start, len(rows)):
-                row = rows[i]
-                if len(row) < 2 or not row[0]:  # Stop when we reach an empty row (mindestens Name und eine weitere Spalte)
+        # Wenn wir die Produkte-Sektion nicht gefunden haben, suchen wir nach "Produkte" am Anfang
+        if products_section_start == -1:
+            for i, line in enumerate(lines):
+                if line.startswith("Produkte;"):
+                    products_section_start = i + 2  # +2 weil wir die Header-Zeile überspringen wollen
                     break
+        
+        # Als letzter Versuch suchen wir nach der Zeile, die mit "Produkte" beginnt
+        if products_section_start == -1:
+            for i, line in enumerate(lines):
+                if line.strip() and line.split(';')[0].strip() == "Produkte":
+                    products_section_start = i + 2  # +2 für die Header-Zeile
+                    break
+        
+        # Wenn wir die Produkte-Sektion gefunden haben
+        if products_section_start != -1 and products_section_start < len(lines):
+            # Finde den Anfang der tatsächlichen Produktdaten (nach den Header-Zeilen)
+            actual_products_start = products_section_start
+            
+            # Überspringen Sie die Zeilen, bis Sie zur konkreten Produktliste kommen
+            # Dies ist normalerweise nach Zeile 80 im Bericht
+            for i in range(products_section_start, len(lines)):
+                if i >= 80 and i < len(lines) and lines[i].strip():
+                    actual_products_start = i
+                    break
+            
+            # Jetzt verarbeiten wir die tatsächlichen Produktdaten
+            for i in range(actual_products_start, len(lines)):
+                line = lines[i].strip()
                 
-                # Extract product name, quantity, and total
-                # Check the format of the row to determine the correct columns
-                # Standardformat in den obersten Zeilen: Produkt ist tatsächlich in der ersten Spalte
-                product_name = row[0]  # Die Produkte stehen in der ersten Spalte (Index 0)
+                # Wenn wir eine leere Zeile erreichen oder eine, die nicht wie Produktdaten aussieht, brechen wir ab
+                if not line or not ";" in line:
+                    continue
                 
-                # Wenn wir in den "Produkte;Total" Zeilen sind, könnte das Format anders sein
-                # Versuche verschiedene Spaltenindizes für die Daten
-                if ";" in row[0] or row[0].isdigit():  # Falls ein Semikolon im Namen ist oder die erste Spalte eine Zahl ist
-                    # Möglicherweise ist die zweite Spalte der Produktname
-                    if len(row) > 1 and row[1] and not row[1].isdigit():
-                        product_name = row[1]
+                # Zeile in Teile zerlegen
+                parts = line.split(';')
                 
-                # Versuche verschiedene mögliche Spalten für Menge und Gesamtpreis
-                # Durchlaufe mögliche Indizes für Menge und Preis
+                # Produktname sollte das erste Feld sein, aber manchmal kann es leer sein oder eine Zahl
+                product_name = parts[0].strip()
+                
+                # Wenn der Produktname nicht vorhanden ist oder nur eine Zahl ist, überspringen wir diese Zeile
+                if not product_name or product_name.isdigit():
+                    continue
+                
+                # Jetzt suchen wir die Mengen- und Gesamtpreis-Spalten
+                # In den meisten Fällen sollten sie direkt nach dem Produktnamen kommen
                 quantity_str = None
                 total_str = None
                 
-                for i in range(1, min(6, len(row))):
-                    val = row[i].strip() if i < len(row) else ""
-                    if val and val.isdigit():  # Falls wir eine ganze Zahl finden (wahrscheinlich Menge)
-                        quantity_str = val
-                        # Der nächste Wert könnte der Preis sein
-                        if i+1 < len(row):
-                            total_str = row[i+1].strip()
+                # Durchsuchen Sie die Teile nach Zahlen, um Menge und Preis zu finden
+                for j in range(1, min(len(parts), 10)):  # Beschränke die Suche auf die ersten 10 Spalten
+                    part = parts[j].strip()
+                    
+                    # Wenn der Teil eine Zahl ist, könnte es die Menge sein
+                    if part.isdigit() and quantity_str is None:
+                        quantity_str = part
+                        # Der nächste Teil könnte der Preis sein
+                        if j+1 < len(parts):
+                            next_part = parts[j+1].strip()
+                            # Preis könnte ein Dezimalwert mit Komma sein
+                            if next_part and (next_part.replace(',', '.').replace('.', '').isdigit() or 
+                                            (next_part.count(',') == 1 and next_part.replace(',', '').isdigit())):
+                                total_str = next_part
                         break
                 
-                # Fallback für ältere Versionen des Codes
-                if quantity_str is None and len(row) > 2:
-                    quantity_str = row[2]
-                if total_str is None and len(row) > 3:
-                    total_str = row[3]
-                
-                # Clean and convert values
+                # Wenn wir Menge und Preis gefunden haben, verarbeiten wir die Daten
                 if product_name and quantity_str and total_str:
                     try:
                         quantity = int(quantity_str)
+                        # Preisformatierung für deutsche Zahlenformate (Komma als Dezimaltrennzeichen)
                         total = float(total_str.replace('.', '').replace(',', '.'))
                         
                         result['products'].append({
@@ -199,8 +200,43 @@ def process_sales_data(sales_file):
                         })
                         
                         result['total_sales'] += total
-                    except (ValueError, TypeError):
-                        pass  # Skip rows with invalid data
+                    except (ValueError, TypeError) as e:
+                        print(f"Fehler beim Verarbeiten von Zeile {i}: {line} - {str(e)}")
+                        # Fehlerhafte Zeilen überspringen
+                        pass
+            
+            # Wenn wir keine Produkte gefunden haben, versuchen wir eine alternative Methode
+            if not result['products']:
+                print("Keine Produkte mit regulärem Parsing gefunden. Verwende alternative Methode.")
+                # Alternative Methode: Suchen nach Zeilen, die nach dem Muster "Name;0;Menge;Preis;%" aussehen
+                for i in range(actual_products_start, len(lines)):
+                    line = lines[i].strip()
+                    
+                    if not line or not ";" in line:
+                        continue
+                    
+                    parts = line.split(';')
+                    
+                    # Überprüfen, ob die Zeile dem erwarteten Format entspricht
+                    if len(parts) >= 5 and parts[1].strip() == "0" and parts[4].strip().endswith("%"):
+                        product_name = parts[0].strip()
+                        quantity_str = parts[2].strip()
+                        total_str = parts[3].strip()
+                        
+                        if product_name and quantity_str and total_str:
+                            try:
+                                quantity = int(quantity_str)
+                                total = float(total_str.replace('.', '').replace(',', '.'))
+                                
+                                result['products'].append({
+                                    'product_name': product_name,
+                                    'quantity': quantity,
+                                    'total': total
+                                })
+                                
+                                result['total_sales'] += total
+                            except (ValueError, TypeError):
+                                pass  # Fehlerhafte Zeilen überspringen
         
         return result
     
