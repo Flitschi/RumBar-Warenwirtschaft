@@ -46,10 +46,10 @@ display_header()
 
 # Sidebar
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Select Page", ["Dashboard", "Inventory Management", "Recipe Management", "Sales Import"])
+page = st.sidebar.radio("Seite auswählen", ["Dashboard", "Lagerbestand", "Rezepte", "Verkaufsdaten"])
 
 # Load demo data option
-if st.sidebar.button("Load Demo Data"):
+if st.sidebar.button("Demo-Daten laden"):
     st.session_state.inventory_data, st.session_state.recipe_data = load_demo_data()
     
     if st.session_state.recipe_data is not None and st.session_state.inventory_data is not None:
@@ -57,13 +57,13 @@ if st.sidebar.button("Load Demo Data"):
         st.session_state.drink_costs = calculate_drink_costs(st.session_state.recipe_data, st.session_state.inventory_data)
         st.session_state.available_drinks = calculate_available_drinks(st.session_state.recipe_data, st.session_state.inventory_data)
         st.session_state.low_stock_warnings = get_low_stock_warnings(st.session_state.recipe_data, st.session_state.inventory_data)
-        st.sidebar.success("Demo data loaded successfully!")
+        st.sidebar.success("Demo-Daten erfolgreich geladen!")
         st.rerun()
     else:
-        st.sidebar.error("Failed to load demo data.")
+        st.sidebar.error("Fehler beim Laden der Demo-Daten.")
 
 # Reset application data
-if st.sidebar.button("Reset All Data"):
+if st.sidebar.button("Alle Daten zurücksetzen"):
     for key in st.session_state.keys():
         del st.session_state[key]
     st.rerun()
@@ -74,46 +74,46 @@ if page == "Dashboard":
     
     if (st.session_state.inventory_data is None or 
         st.session_state.recipe_data is None):
-        st.info("Please load data to view the dashboard. You can either:")
+        st.info("Bitte laden Sie Daten, um das Dashboard anzuzeigen. Sie können entweder:")
         col1, col2 = st.columns(2)
         with col1:
-            st.info("1. Click 'Load Demo Data' in the sidebar")
+            st.info("1. Klicken Sie auf 'Demo-Daten laden' in der Seitenleiste")
         with col2:
-            st.info("2. Import your inventory and recipe data in the respective sections")
+            st.info("2. Importieren Sie Ihre Lagerbestand- und Rezeptdaten in den entsprechenden Bereichen")
     else:
         # Display summary statistics
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.subheader("Inventory Overview")
-            st.metric("Total Ingredients", len(st.session_state.inventory_data))
+            st.subheader("Lagerbestand Übersicht")
+            st.metric("Anzahl Zutaten", len(st.session_state.inventory_data))
             
             # Display low stock warnings if any
             if st.session_state.low_stock_warnings and len(st.session_state.low_stock_warnings) > 0:
-                st.warning(f"⚠️ {len(st.session_state.low_stock_warnings)} ingredients with low stock!")
+                st.warning(f"⚠️ {len(st.session_state.low_stock_warnings)} Zutaten mit niedrigem Bestand!")
             else:
-                st.success("All ingredients have sufficient stock")
+                st.success("Alle Zutaten haben ausreichend Bestand")
         
         with col2:
-            st.subheader("Recipe Overview")
-            st.metric("Total Recipes", len(st.session_state.recipe_data['drink_name'].unique()))
+            st.subheader("Rezepte Übersicht")
+            st.metric("Anzahl Rezepte", len(st.session_state.recipe_data['drink_name'].unique()))
             
             # Most expensive drink
             if st.session_state.drink_costs is not None:
                 most_expensive = st.session_state.drink_costs.sort_values('total_cost', ascending=False).iloc[0]
-                st.metric("Most Expensive Drink", 
+                st.metric("Teuerster Drink", 
                           f"{most_expensive['drink_name']} (€{most_expensive['total_cost']:.2f})")
         
         with col3:
-            st.subheader("Sales Overview")
+            st.subheader("Verkaufsdaten Übersicht")
             if st.session_state.sales_summary is not None:
-                st.metric("Total Sales Value", f"€{st.session_state.sales_summary['total_value']:.2f}")
-                st.metric("Most Sold Drink", st.session_state.sales_summary['most_sold_drink'])
+                st.metric("Gesamtumsatz", f"€{st.session_state.sales_summary['total_value']:.2f}")
+                st.metric("Meistverkaufter Drink", st.session_state.sales_summary['most_sold_drink'])
             else:
-                st.info("No sales data imported yet")
+                st.info("Noch keine Verkaufsdaten importiert")
         
         # Display low stock warnings
-        st.subheader("Low Stock Warnings")
+        st.subheader("Warnungen bei niedrigem Lagerbestand")
         if st.session_state.low_stock_warnings and len(st.session_state.low_stock_warnings) > 0:
             warning_df = pd.DataFrame(st.session_state.low_stock_warnings)
             warning_df = warning_df.sort_values('max_drinks_possible', ascending=True)
@@ -133,23 +133,23 @@ if page == "Dashboard":
                         help="Exportiere die Zutatenliste mit niedrigem Bestand als CSV-Datei für den Einkauf"
                     )
         else:
-            st.success("No low stock warnings - all ingredients have sufficient quantities!")
+            st.success("Keine Warnungen - alle Zutaten haben ausreichend Lagerbestand!")
         
         # Display available drinks
-        st.subheader("Available Drinks")
+        st.subheader("Verfügbare Drinks")
         if st.session_state.available_drinks is not None:
             avail_df = st.session_state.available_drinks.sort_values('max_drinks_possible', ascending=True)
             st.dataframe(avail_df, use_container_width=True)
         
         # Display drink costs
-        st.subheader("Drink Costs")
+        st.subheader("Drink Kosten")
         if st.session_state.drink_costs is not None:
             cost_df = st.session_state.drink_costs.sort_values('total_cost', ascending=False)
             st.dataframe(cost_df, use_container_width=True)
 
 # Inventory Management Page
-elif page == "Inventory Management":
-    st.title("Inventory Management")
+elif page == "Lagerbestand":
+    st.title("Lagerbestand Management")
     
     # Upload inventory CSV
     st.subheader("Import Inventory Data")
@@ -200,8 +200,8 @@ elif page == "Inventory Management":
         st.info("Please upload inventory data or load demo data from the sidebar.")
 
 # Recipe Management Page
-elif page == "Recipe Management":
-    st.title("Recipe Management")
+elif page == "Rezepte":
+    st.title("Rezepte Management")
     
     # Upload recipe CSV
     st.subheader("Import Recipe Data")
@@ -316,8 +316,8 @@ elif page == "Recipe Management":
         st.info("Please make sure both inventory and recipe data are loaded before adding new recipes.")
 
 # Sales Import Page
-elif page == "Sales Import":
-    st.title("Import Daily Sales Data")
+elif page == "Verkaufsdaten":
+    st.title("Tägliche Verkaufsdaten importieren")
     
     # Check if recipe and inventory data are available
     if st.session_state.recipe_data is None or st.session_state.inventory_data is None:
