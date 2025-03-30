@@ -379,12 +379,24 @@ def export_low_stock_warnings_to_csv(warnings):
             'target_stock_ml': 'Zielbestand (ml)'
         })
         
-        # Add a column for the amount to purchase
-        shopping_list['Benötigte Menge (ml)'] = shopping_list['Zielbestand (ml)'] - shopping_list['Aktueller Bestand (ml)']
-        shopping_list['Benötigte Menge (ml)'] = shopping_list['Benötigte Menge (ml)'].apply(lambda x: max(0, x))
+        # Add a column for the required amount to have at least 15 drinks of each cocktail
+        # This should be at least the target stock level, which already accounts for the minimum needed
+        needed_for_15_drinks = []
         
-        # Add a column for the amount to purchase in bottles (assume 700ml per bottle)
-        shopping_list['Benötigte Flaschen (à 700ml)'] = (shopping_list['Benötigte Menge (ml)'] / 700).round(2)
+        for _, row in shopping_list.iterrows():
+            ingredient_name = row['Zutat']
+            current_stock = row['Aktueller Bestand (ml)']
+            target_stock = row['Zielbestand (ml)']
+            
+            # The needed amount is max(target_stock, current_stock needed for 15 drinks)
+            # Since target_stock should already account for this, use it as a baseline
+            needed_amount = max(0, target_stock - current_stock)
+            needed_for_15_drinks.append(needed_amount)
+            
+        shopping_list['Benötigte Menge (ml)'] = needed_for_15_drinks
+        
+        # Add a column for the amount to purchase in liters (not bottles)
+        shopping_list['Benötigte Menge (Liter)'] = (shopping_list['Benötigte Menge (ml)'] / 1000).round(2)
         
         # Sort by needed amount (descending)
         shopping_list = shopping_list.sort_values('Benötigte Menge (ml)', ascending=False)
@@ -414,6 +426,9 @@ def get_low_stock_warnings(recipe_data, inventory_data, threshold=15):
         # Dictionary to track minimum drinks possible for each ingredient
         ingredient_min_drinks = {}
         
+        # Dictionary to track total needed amount for each ingredient to reach threshold
+        ingredient_needed_for_threshold = {}
+        
         # Get unique drink names
         unique_drinks = recipe_data['drink_name'].unique()
         
@@ -438,12 +453,21 @@ def get_low_stock_warnings(recipe_data, inventory_data, threshold=15):
                     # Calculate how many drinks can be made with this ingredient
                     drinks_possible = int(current_stock / amount_needed)
                     
+                    # Calculate how much of this ingredient is needed for threshold drinks
+                    amount_for_threshold = threshold * amount_needed
+                    
+                    # Add to the total needed for this ingredient
+                    if ingredient_name in ingredient_needed_for_threshold:
+                        ingredient_needed_for_threshold[ingredient_name] += amount_for_threshold
+                    else:
+                        ingredient_needed_for_threshold[ingredient_name] = amount_for_threshold
+                    
                     # Update the minimum drinks possible for this ingredient
                     if ingredient_name not in ingredient_min_drinks or drinks_possible < ingredient_min_drinks[ingredient_name]['max_drinks_possible']:
                         ingredient_min_drinks[ingredient_name] = {
                             'max_drinks_possible': drinks_possible,
                             'current_stock_ml': current_stock,
-                            'target_stock_ml': target_stock,
+                            'target_stock_ml': max(target_stock, ingredient_needed_for_threshold[ingredient_name]),
                             'most_limiting_drink': drink_name
                         }
         
