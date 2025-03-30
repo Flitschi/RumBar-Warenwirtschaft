@@ -1,0 +1,7 @@
+pyproject.toml
+replit.nix
+.replit
+uv.lock
+venv/
+__pycache__/
+*.pyc
